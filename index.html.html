@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Customer - Green River View</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+        h1, h2 {
+            text-align: center;
+            color: #4CAF50;
+            margin-top: 20px;
+        }
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            margin: 20px auto;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table th, table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        table th {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .form-container {
+            margin-bottom: 20px;
+        }
+        select, input, textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        #acConfigContainer div {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        #searchInput {
+            width: 100%;
+            padding: 10px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Database Customer</h1>
+        <h2>Green River View</h2>
+
+        <div class="form-container">
+            <form id="customerForm">
+                <label for="name">Nama:</label>
+                <input type="text" id="name" required placeholder="Masukkan nama pelanggan">
+                <label for="phone">Nomor Telepon:</label>
+                <input type="text" id="phone" required placeholder="Masukkan nomor telepon">
+
+                <label for="acConfig">Tipe AC dan Freon:</label>
+                <div id="acConfigContainer">
+                    <div>
+                        <select class="acType">
+                            <option value="1 PK">1 PK</option>
+                            <option value="2 PK">2 PK</option>
+                            <option value="1/2 PK">1/2 PK</option>
+                        </select>
+                        <select class="freonType">
+                            <option value="R32">R32</option>
+                            <option value="R410">R410</option>
+                            <option value="R22">R22</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="button" onclick="addAcConfig()">Tambah Tipe AC + Freon</button>
+
+                <label for="cluster">Cluster:</label>
+                <select id="cluster">
+                    <option value="Laurus">Laurus</option>
+                    <option value="Rosemary">Rosemary</option>
+                    <option value="Vinca">Vinca</option>
+                    <option value="Marigold">Marigold</option>
+                    <option value="Magnolia">Magnolia</option>
+                    <option value="Artemisia">Artemisia</option>
+                    <option value="Primrose">Primrose</option>
+                </select>
+                <label for="street">Jalan:</label>
+                <input type="text" id="street" placeholder="Masukkan nama jalan">
+                <button type="button" onclick="addCustomer()">Tambahkan</button>
+            </form>
+        </div>
+
+        <!-- Search Input -->
+        <input type="text" id="searchInput" placeholder="Cari pelanggan berdasarkan nama, nomor telepon, cluster, atau jalan..." oninput="searchCustomer()">
+
+        <table id="customerTable">
+            <thead>
+                <tr>
+                    <th>Nama</th>
+                    <th>Nomor Telepon</th>
+                    <th>Cluster</th>
+                    <th>Jalan</th>
+                    <th>Tipe AC + Freon</th>
+                    <th>Riwayat Pengerjaan</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+
+        <!-- Export Buttons -->
+        <div style="margin-top: 20px; text-align: center;">
+            <button onclick="exportToExcel()">Ekspor ke Excel</button>
+            <button onclick="exportToPDF()">Ekspor ke PDF</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://your-backend-api-url.com/api/customers';
+
+async function fetchCustomers() {
+    const response = await fetch(API_URL);
+    const customers = await response.json();
+    renderTable(customers);
+}
+
+async function addCustomer() {
+    const customer = {
+        name: document.getElementById('name').value,
+        phone: document.getElementById('phone').value,
+        cluster: document.getElementById('cluster').value,
+        street: document.getElementById('street').value,
+        acConfigs: Array.from(document.querySelectorAll('.acType')).map((ac, i) =>
+            `${ac.value} ${document.querySelectorAll('.freonType')[i].value}`
+        ),
+    };
+
+    await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(customer),
+    });
+
+    fetchCustomers();
+}
+
+async function deleteCustomer(id) {
+    await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+    fetchCustomers();
+}
+
+window.onload = fetchCustomers;
+        let customers = JSON.parse(localStorage.getItem('customers')) || [];
+
+        function saveToLocalStorage() {
+            localStorage.setItem('customers', JSON.stringify(customers));
+        }
+
+        function addAcConfig() {
+            const container = document.getElementById('acConfigContainer');
+            const div = document.createElement('div');
+            div.innerHTML = `
+                <select class="acType">
+                    <option value="1 PK">1 PK</option>
+                    <option value="2 PK">2 PK</option>
+                    <option value="1/2 PK">1/2 PK</option>
+                </select>
+                <select class="freonType">
+                    <option value="R32">R32</option>
+                    <option value="R410">R410</option>
+                    <option value="R22">R22</option>
+                </select>
+            `;
+            container.appendChild(div);
+        }
+
+        function addCustomer() {
+            const name = document.getElementById('name').value;
+            const phone = document.getElementById('phone').value;
+            const cluster = document.getElementById('cluster').value;
+            const street = document.getElementById('street').value;
+
+            const acConfigElements = document.getElementById('acConfigContainer').querySelectorAll('div');
+            const acConfigs = Array.from(acConfigElements).map(div => {
+                const acType = div.querySelector('.acType').value;
+                const freonType = div.querySelector('.freonType').value;
+                return `${acType} ${freonType}`;
+            }).join(", ");
+
+            if (!name || !phone) {
+                alert('Nama dan Nomor Telepon wajib diisi!');
+                return;
+            }
+
+            customers.push({ name, phone, cluster, street, acConfigs, history: [] });
+            saveToLocalStorage();
+            renderTable();
+
+            document.getElementById('customerForm').reset();
+            document.getElementById('acConfigContainer').innerHTML = `
+                <div>
+                    <select class="acType">
+                        <option value="1 PK">1 PK</option>
+                        <option value="2 PK">2 PK</option>
+                        <option value="1/2 PK">1/2 PK</option>
+                    </select>
+                    <select class="freonType">
+                        <option value="R32">R32</option>
+                        <option value="R410">R410</option>
+                        <option value="R22">R22</option>
+                    </select>
+                </div>
+            `;
+        }
+
+        function renderTable(filteredCustomers = customers) {
+            const tableBody = document.getElementById('customerTable').querySelector('tbody');
+            tableBody.innerHTML = '';
+            filteredCustomers.forEach((customer, index) => {
+                const historyList = customer.history.map(item => 
+                    `<li>${item.date}: ${item.type} - ${item.description}</li>`).join('');
+                const acConfigList = customer.acConfigs.split(', ').map(acConfig => `<li>${acConfig}</li>`).join('');
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${customer.name}</td>
+                    <td>${customer.phone}</td>
+                    <td>${customer.cluster}</td>
+                    <td>${customer.street}</td>
+                    <td><ul>${acConfigList}</ul></td>
+                    <td><ul>${historyList}</ul></td>
+                    <td>
+                        <button onclick="updateCustomer(${index})">Update</button>
+                        <button onclick="deleteCustomer(${index})">Hapus</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        function searchCustomer() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const filteredCustomers = customers.filter(customer => 
+                customer.name.toLowerCase().includes(query) ||
+                customer.phone.toLowerCase().includes(query) ||
+                customer.cluster.toLowerCase().includes(query) ||
+                customer.street.toLowerCase().includes(query)
+            );
+            renderTable(filteredCustomers);
+        }
+
+        function updateCustomer(index) {
+            const date = prompt("Masukkan tanggal pengerjaan (YYYY-MM-DD):");
+            const type = prompt("Jenis pengerjaan (misal: Cuci AC, Servis AC):");
+            const description = prompt("Deskripsi pengerjaan:");
+            if (date && type && description) {
+                customers[index].history.push({ date, type, description });
+                saveToLocalStorage();
+                renderTable();
+            } else {
+                alert("Semua field harus diisi!");
+            }
+        }
+
+        function deleteCustomer(index) {
+            customers.splice(index, 1);
+            saveToLocalStorage();
+            renderTable();
+        }
+
+        function exportToExcel() {
+            const workbook = XLSX.utils.book_new();
+            const worksheetData = customers.map(customer => ({
+                Nama: customer.name,
+                'Nomor Telepon': customer.phone,
+                Cluster: customer.cluster,
+                Jalan: customer.street,
+                'Tipe AC + Freon': customer.acConfigs,
+                'Riwayat Pengerjaan': customer.history.map(h => `${h.date}: ${h.type} - ${h.description}`).join("; ")
+            }));
+            const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Data Customer');
+            XLSX.writeFile(workbook, 'Database_Customer.xlsx');
+        }
+
+        function exportToPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const tableColumn = ['Nama', 'Nomor Telepon', 'Cluster', 'Jalan', 'Tipe AC + Freon', 'Riwayat Pengerjaan'];
+            const tableRows = customers.map(customer => [
+                customer.name,
+                customer.phone,
+                customer.cluster,
+                customer.street,
+                customer.acConfigs,
+                customer.history.map(h => `${h.date}: ${h.type} - ${h.description}`).join("\n")
+            ]);
+
+            doc.text('Database Customer - Green River View', 14, 10);
+            doc.autoTable({
+                head: [tableColumn],
+                body: tableRows,
+                startY: 20
+            });
+            doc.save('Database_Customer.pdf');
+        }
+
+        window.onload = function () {
+            renderTable();
+        };
+        
+    </script>
+</body>
+</html>
